@@ -36,3 +36,14 @@ app.listen(port, () => {
 app.get("/", (req, res) => {
  res.json("Live Here")
 })
+
+app.get("/student", async (req, res) => {
+ const sql = "SELECT * FROM student";
+ const result = await queryDatabase(sql, [], res);
+
+ if (result.rows.length === 0) {
+   return res.status(404).json({ error: "No students found" });
+ }
+
+ return res.status(200).json(result.rows);
+});
