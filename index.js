@@ -19,12 +19,8 @@ const postgresPool = new Pool({
   max: parseInt(process.env.DB_MAX_CLIENTS, 10),
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
-  ssl: {
-    require: true,
-    rejectUnauthorized: false,
-  }
+  ssl: { rejectUnauthorized: false },
 });
-
 
 // Function to connect to the PostgreSQL database
 const connectToDatabase = async () => {
