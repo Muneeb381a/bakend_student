@@ -43,11 +43,7 @@ app.listen(port, () => {
   console.log(`Server is listening at port ${port}`);
 });
 
-app.get("/", (req, res) => {
-  res.json("Live Here");
-});
-
-app.get("/student", async (req, res) => {
+app.get("/", async(req, res) => {
   try {
     const result = await postgresPool.query("SELECT * FROM student");
 
@@ -61,3 +57,18 @@ app.get("/student", async (req, res) => {
     res.status(500).json({ error: "An error occurred while fetching students." });
   }
 });
+
+// app.get("/student", async (req, res) => {
+//   try {
+//     const result = await postgresPool.query("SELECT * FROM student");
+
+//     if (result.rows.length === 0) {
+//       return res.status(404).json({ error: "No students found" });
+//     }
+
+//     return res.status(200).json(result.rows);
+//   } catch (error) {
+//     console.error("Error fetching students:", error.message);
+//     res.status(500).json({ error: "An error occurred while fetching students." });
+//   }
+// });
