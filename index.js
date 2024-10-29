@@ -2,6 +2,7 @@ import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 import { connectToDatabase } from "./utils/db.js";
+import Pool from "pg-pool"
 
 dotenv.config();
 
@@ -39,7 +40,7 @@ app.listen(port, () => {
   console.log(`Server is listening at port ${port}`);
 });
 
-app.get("/", async(req, res) => {
+app.get("/api/students", async (req, res) => {
   try {
     const result = await postgresPool.query("SELECT * FROM student");
 
@@ -50,12 +51,12 @@ app.get("/", async(req, res) => {
     return res.status(200).json(result.rows);
   } catch (error) {
     console.error("Error fetching students:", error.message);
-    res.status(500).json({ error: "An error occurred while fetching students." });
+    return res.status(500).json({ error: "An error occurred while fetching students." });
   }
 });
 
 
-app.get("class", async(req, res) => {
+app.get("/class", async(req, res) => {
   try {
     const result = await postgresPool.query("SELECT * FROM class");
 
