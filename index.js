@@ -40,7 +40,7 @@ app.listen(port, () => {
   console.log(`Server is listening at port ${port}`);
 });
 
-app.get("/api/students", async (req, res) => {
+app.get("/", async (req, res) => {
   try {
     const result = await postgresPool.query("SELECT * FROM student");
 
