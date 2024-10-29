@@ -54,17 +54,20 @@ app.get("/", async(req, res) => {
   }
 });
 
-// app.get("/student", async (req, res) => {
-//   try {
-//     const result = await postgresPool.query("SELECT * FROM student");
 
-//     if (result.rows.length === 0) {
-//       return res.status(404).json({ error: "No students found" });
-//     }
+app.get("/class", async(req, res) => {
+  try {
+    const result = await postgresPool.query("SELECT * FROM class");
 
-//     return res.status(200).json(result.rows);
-//   } catch (error) {
-//     console.error("Error fetching students:", error.message);
-//     res.status(500).json({ error: "An error occurred while fetching students." });
-//   }
-// });
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "No class found" });
+    }
+
+    return res.status(200).json(result.rows);
+  } catch (error) {
+    console.error("Error fetching class:", error.message);
+    res.status(500).json({ error: "An error occurred while fetching classes." });
+  }
+});
+
+
