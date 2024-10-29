@@ -39,9 +39,23 @@ app.listen(port, () => {
   console.log(`Server is listening at port ${port}`);
 });
 
-app.get("/student", async (req, res) => {
+app.get("/students", async (req, res) => {
   try {
-    const result = await postgresPool.query("SELECT * FROM student");
+    const result = await postgresPool.query(`
+      SELECT 
+        s.id,
+        s.name,
+        s.father_name,
+        s.address,
+        s.phone_number,
+        s.email,
+        s.roll_no,
+        c.class_name
+      FROM 
+        student s
+      LEFT JOIN 
+        class c ON s.class_id = c.class_id
+    `);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "No students found" });
@@ -53,6 +67,7 @@ app.get("/student", async (req, res) => {
     return res.status(500).json({ error: "An error occurred while fetching students." });
   }
 });
+
 
 
 app.get("/class", async(req, res) => {
