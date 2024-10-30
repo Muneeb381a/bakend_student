@@ -114,28 +114,31 @@ app.get("/api/students/:student_id/fees", async (req, res) => {
 
 app.get("/api/fees", async (req, res) => {
   try {
-    const result = await postgresPool.query(`
+    const query = `
       SELECT 
-        fee.fee_id,
-        fee.fee_amount,
-        fee.fee_due_date,
-        fee.fee_status,
-        student.name AS student_name,
-        student.roll_no,
-        class.class_name,
-        class.section
-      FROM fee
-      JOIN student ON fee.student_id = student.id
-      JOIN class ON student.class_id = class.class_id
-    `);
+        s.name AS student_name, 
+        s.roll_no,
+        c.class_name,
+        c.section,
+        f.amount AS fee_amount, 
+        f.due_date AS fee_due_date, 
+        f.status AS fee_status
+      FROM 
+        fee f
+      JOIN 
+        student s ON s.id = f.student_id
+      JOIN 
+        class c ON c.class_id = s.class_id;
+    `;
+    const result = await postgresPool.query(query);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "No fee records found" });
     }
-
-    res.status(200).json(result.rows);
+    return res.status(200).json(result.rows);
   } catch (error) {
     console.error("Error fetching fees:", error.message);
     res.status(500).json({ error: "An error occurred while fetching fees." });
   }
 });
+
