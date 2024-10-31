@@ -160,6 +160,7 @@ app.get("/api/subjects", async(req, res) => {
   try {
     const result= await postgresPool.query(`
         SELECT
+          subject.subject_id,
           subject.subject_name,
           teacher.name AS teacher_name,
           subject.description
