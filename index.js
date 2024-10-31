@@ -153,3 +153,29 @@ app.get("/api/teachers", async(req, res) => {
     res.status(500).json({error: "An error occured while fetching teachers"})
   }
 })
+
+// getting all the subjects
+
+app.get("/api/subjects", async(req, res) => {
+  try {
+    const result= await postgresPool.query(`
+        SELECT
+          subject.subject_name,
+          teacher.name AS teacher_name,
+          subject.description
+          FROM
+            subject
+          JOIN
+            teacher
+          ON
+            subject.teacher_id = teacher.teacher_id
+      `);
+      if(result.rows.length === 0) {
+        return res.status(404).json({error: "No Subjects Found"})
+      }
+      res.status(200).json(result.rows)
+  } catch (error) {
+    console.error("Error while fething subjects", error.message)
+    res.status(500).json({error: "Error occured while fething subjects"})
+  }
+})
