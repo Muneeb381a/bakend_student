@@ -142,3 +142,14 @@ app.get("/api/fees", async (req, res) => {
   }
 });
 
+// getting all teachers
+
+app.get("/api/teachers", async(req, res) => {
+  try {
+    const result = await postgresPool.query("SELECT * FROM teacher;")
+    res.json(result.rows)
+  } catch (error) {
+    console.error("Error fetching class", error)
+    res.status(500).json({error: "An error occured while fetching teachers"})
+  }
+})
