@@ -3,31 +3,21 @@ import dotenv from "dotenv";
 import cors from "cors";
 import Pool from "pg-pool";
 import multer from "multer";
-import {CloudinaryStorage} from "multer-storage-cloudinary";
-import { cloudinary } from "./config.js";
-
-
-// creating multer storage with cloudinary
-
-const storage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: "profile_pic",
-    format: async (req, file) => {
-      const mimeTypes = {
-        "image/jpeg": "jpg",
-        "image/png": "png",
-        "image/gif": "gif"
-      };
-      return mimeTypes[file.mimeType] || "jpg";
-    },
-    public_id: () => Date.now()
-  }
-});
-
-const upload = multer({storage});
+import { v2 as cloudinary} from "cloudinary";
+import path from "path";
 
 dotenv.config();
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+ });
+
+const storage = multer.memoryStorage();
+const upload = multer({storage});
+
+
 
 const app = express();
 
@@ -76,6 +66,7 @@ app.get("/api/students", async (req, res) => {
               s.phone_number,
               s.email,
               s.roll_no,
+              s.profile_pic,
               c.class_name,
               f.amount AS fee_amount,
               f.due_date AS fee_due_date,
@@ -235,7 +226,38 @@ app.post("/api/student",upload.single("profile_pic"), async (req, res) => {
     });
   }
 
-  const profilePicUrl = req.file ? req.file.path : null;
+  let profilePicUrl = null;
+
+  // if a profile picture is uploaded, upload t to cloudinary
+
+  if (req.file) {
+    try {
+      const uploadToCloudinary = () =>
+        new Promise((resolve, reject) => {
+          const stream = cloudinary.uploader.upload_stream(
+            {
+              folder: "profile_pic",
+              public_id: Date.now().toString(),
+              resource_type: "image",
+              format: path.extname(req.file.originalname).substring(1) || "jpg",
+            },
+            (error, result) => {
+              if (error) {
+                reject(error);
+              } else {
+                resolve(result.secure_url);
+              }
+            }
+          );
+          stream.end(req.file.buffer);
+        });
+
+      profilePicUrl = await uploadToCloudinary();
+    } catch (error) {
+      console.error("Error uploading image to Cloudinary:", error);
+      return res.status(500).json({ error: "Image upload failed" });
+    }
+  }
 
   const query = `
     INSERT INTO student (class_id, address, phone_number, email, roll_no, name, father_name, profile_pic)
