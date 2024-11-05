@@ -77,6 +77,8 @@ app.get("/api/students", async (req, res) => {
               class c ON s.class_id = c.class_id
           LEFT JOIN 
               fee f ON s.fee_id = f.fee_id
+          ORDER BY
+              s.id ASC
       `);
 
     if (result.rows.length === 0) {
