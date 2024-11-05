@@ -2,6 +2,30 @@ import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 import Pool from "pg-pool";
+import multer from "multer";
+import {CloudinaryStorage} from "multer-storage-cloudinary";
+import { cloudinary } from "./config.js";
+
+
+// creating multer storage with cloudinary
+
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: "profile_pic",
+    format: async (req, file) => {
+      const mimeTypes = {
+        "image/jpeg": "jpg",
+        "image/png": "png",
+        "image/gif": "gif"
+      };
+      return mimeTypes[file.mimeType] || "jpg";
+    },
+    public_id: () => Date.now()
+  }
+});
+
+const upload = multer({storage});
 
 dotenv.config();
 
@@ -188,7 +212,7 @@ app.get("/api/subjects", async (req, res) => {
 });
 
 // POST route for student
-app.post("/api/student", async (req, res) => {
+app.post("/api/student",upload.single("profile_pic"), async (req, res) => {
   const { class_id, address, phone_number, email, roll_no, name, father_name } =
     req.body;
 
@@ -211,9 +235,11 @@ app.post("/api/student", async (req, res) => {
     });
   }
 
+  const profilePicUrl = req.file ? req.file.path : null;
+
   const query = `
-    INSERT INTO student (class_id, address, phone_number, email, roll_no, name, father_name)
-    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    INSERT INTO student (class_id, address, phone_number, email, roll_no, name, father_name, profile_pic)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     RETURNING *`;
 
   const values = [
@@ -224,6 +250,7 @@ app.post("/api/student", async (req, res) => {
     roll_no,
     name,
     father_name,
+    profilePicUrl
   ];
 
   try {
