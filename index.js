@@ -6,7 +6,6 @@ import multer from "multer";
 import { v2 as cloudinary} from "cloudinary";
 import path from "path";
 
-
 dotenv.config();
 
 cloudinary.config({
@@ -22,11 +21,10 @@ const upload = multer({storage});
 
 const app = express();
 
-
+app.use(cors());
 const port = 3000;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cors());
 
 const postgresPool = new Pool({
   user: process.env.DB_USER,
@@ -207,7 +205,7 @@ app.get("/api/subjects", async (req, res) => {
 });
 
 // POST route for student
-app.post("/api/student",upload.single("profile_pic"), async (req, res) => {
+app.post("/api/student", upload.single("profile_pic"), async (req, res) => {
   const { class_id, address, phone_number, email, roll_no, name, father_name } =
     req.body;
 
@@ -220,6 +218,7 @@ app.post("/api/student",upload.single("profile_pic"), async (req, res) => {
     name,
     father_name,
   };
+
   const missingFields = Object.entries(requiredFields)
     .filter(([key, value]) => !value)
     .map(([key]) => key);
@@ -232,9 +231,14 @@ app.post("/api/student",upload.single("profile_pic"), async (req, res) => {
 
   let profilePicUrl = null;
 
-  // if a profile picture is uploaded, upload t to cloudinary
-
+  // If a profile picture is uploaded, upload it to Cloudinary
   if (req.file) {
+    // Validate file type (ensure it's an image)
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif"];
+    if (!allowedTypes.includes(req.file.mimetype)) {
+      return res.status(400).json({ error: "Invalid file type. Only JPEG, PNG, and GIF are allowed." });
+    }
+
     try {
       const uploadToCloudinary = () =>
         new Promise((resolve, reject) => {
@@ -247,60 +251,79 @@ app.post("/api/student",upload.single("profile_pic"), async (req, res) => {
             },
             (error, result) => {
               if (error) {
-                reject(error);
+                reject(error);  // If there's an error, reject the promise
               } else {
-                resolve(result.secure_url);
+                resolve(result.secure_url);  // If successful, resolve the promise
               }
             }
           );
-          stream.end(req.file.buffer);
+          stream.end(req.file.buffer); // End the stream and upload the file
         });
 
-      profilePicUrl = await uploadToCloudinary();
+      profilePicUrl = await uploadToCloudinary();  // Wait for Cloudinary to finish uploading
     } catch (error) {
-      console.error("Error uploading image to Cloudinary:", error);
-      return res.status(500).json({ error: "Image upload failed" });
+      console.error("Error uploading image to Cloudinary:", error);  // Log the error
+      return res.status(500).json({ error: `Image upload failed: ${error.message}` });  // Send error response
     }
   }
 
+  // SQL query to insert student data into the database
   const query = `
     INSERT INTO student (class_id, address, phone_number, email, roll_no, name, father_name, profile_pic)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     RETURNING *`;
 
   const values = [
-    class_id || null, // Allow class_id to be optional
+    class_id || null,  // Allow class_id to be optional
     address,
     phone_number,
     email,
     roll_no,
     name,
     father_name,
-    profilePicUrl
+    profilePicUrl,  // URL of the uploaded profile picture (or null if no image uploaded)
   ];
 
   try {
     const result = await postgresPool.query(query, values);
-    return res.status(201).json(result.rows[0]);
+    return res.status(201).json(result.rows[0]);  // Return the newly created student data
   } catch (error) {
-    console.error("Error while adding the student:", error.message);
+    console.error("Error while adding the student:", error.message);  // Log the error
     return res.status(500).json({
       error: "An error occurred while creating the student.",
-    });
+    });  // Send error response
   }
 });
 
-// update method for student
-
 app.put("/api/student/:id", upload.single("profile_pic"), async (req, res) => {
+  const { id } = req.params; // Get the student ID from the URL parameter
   const { class_id, address, phone_number, email, roll_no, name, father_name } = req.body;
-  const { id } = req.params;
 
+  // Validate required fields (except for profile_pic, as it is optional)
+  const requiredFields = { address, phone_number, email, roll_no, name, father_name };
+  const missingFields = Object.entries(requiredFields)
+    .filter(([key, value]) => !value)
+    .map(([key]) => key);
+
+  if (missingFields.length > 0) {
+    return res.status(400).json({
+      error: `Missing required fields: ${missingFields.join(", ")}`,
+    });
+  }
+
+  // Start with the existing profilePicUrl
   let profilePicUrl = null;
 
   // If a new profile picture is uploaded, upload it to Cloudinary
   if (req.file) {
+    // Validate file type (ensure it's an image)
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif"];
+    if (!allowedTypes.includes(req.file.mimetype)) {
+      return res.status(400).json({ error: "Invalid file type. Only JPEG, PNG, and GIF are allowed." });
+    }
+
     try {
+      // Upload the new image to Cloudinary
       const uploadToCloudinary = () =>
         new Promise((resolve, reject) => {
           const stream = cloudinary.uploader.upload_stream(
@@ -312,39 +335,55 @@ app.put("/api/student/:id", upload.single("profile_pic"), async (req, res) => {
             },
             (error, result) => {
               if (error) {
-                reject(error);
+                reject(error);  // Reject if there's an error
               } else {
-                resolve(result.secure_url);
+                resolve(result.secure_url);  // Resolve with the image URL
               }
             }
           );
-          stream.end(req.file.buffer);
+          stream.end(req.file.buffer);  // End the stream to upload the file
         });
 
-      profilePicUrl = await uploadToCloudinary();
+      profilePicUrl = await uploadToCloudinary();  // Get the Cloudinary image URL
     } catch (error) {
-      console.error("Error uploading image to Cloudinary:", error);
-      return res.status(500).json({ error: "Image upload failed" });
+      console.error("Error uploading image to Cloudinary:", error);  // Log the error
+      return res.status(500).json({ error: `Image upload failed: ${error.message}` });
     }
   }
 
+  // If no new profile picture is uploaded, keep the existing one
+  if (!profilePicUrl) {
+    // Query to get the current student data (including profile pic URL)
+    const getStudentQuery = 'SELECT profile_pic FROM student WHERE id = $1';
+    try {
+      const studentResult = await postgresPool.query(getStudentQuery, [id]);
+      if (studentResult.rows.length === 0) {
+        return res.status(404).json({ error: "Student not found" });
+      }
+      profilePicUrl = studentResult.rows[0].profile_pic;  // Use the existing profile pic URL
+    } catch (error) {
+      console.error("Error fetching student data:", error.message);
+      return res.status(500).json({ error: "An error occurred while fetching student data." });
+    }
+  }
+
+  // SQL query to update the student data in the database
   const updateQuery = `
     UPDATE student
-    SET class_id = $1, address = $2, phone_number = $3, email = $4, roll_no = $5, name = $6, father_name = $7, profile_pic = COALESCE($8, profile_pic)
+    SET class_id = $1, address = $2, phone_number = $3, email = $4, roll_no = $5, name = $6, father_name = $7, profile_pic = $8
     WHERE id = $9
-    RETURNING *;
-  `;
+    RETURNING *`;
 
   const values = [
-    class_id || null,
+    class_id || null,  // Allow class_id to be optional
     address,
     phone_number,
     email,
     roll_no,
     name,
     father_name,
-    profilePicUrl,
-    id,
+    profilePicUrl,  // Updated profile picture URL (or existing one if not changed)
+    id,  // Student ID to identify the record
   ];
 
   try {
@@ -352,14 +391,13 @@ app.put("/api/student/:id", upload.single("profile_pic"), async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "Student not found" });
     }
-    return res.status(200).json(result.rows[0]);
+    return res.status(200).json(result.rows[0]);  // Return the updated student data
   } catch (error) {
-    console.error("Error while updating the student:", error.message);
-    return res.status(500).json({
-      error: "An error occurred while updating the student.",
-    });
+    console.error("Error while updating the student:", error.message);  // Log the error
+    return res.status(500).json({ error: "An error occurred while updating the student." });
   }
 });
+
 
 // Get student throgh id
 app.get("/api/student/:id", async (req, res) => {
