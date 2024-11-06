@@ -288,6 +288,97 @@ app.post("/api/student",upload.single("profile_pic"), async (req, res) => {
   }
 });
 
+// update method for student
+
+app.put("/api/student/:id", upload.single("profile_pic"), async (req, res) => {
+  const { class_id, address, phone_number, email, roll_no, name, father_name } = req.body;
+  const { id } = req.params;
+
+  let profilePicUrl = null;
+
+  // If a new profile picture is uploaded, upload it to Cloudinary
+  if (req.file) {
+    try {
+      const uploadToCloudinary = () =>
+        new Promise((resolve, reject) => {
+          const stream = cloudinary.uploader.upload_stream(
+            {
+              folder: "profile_pic",
+              public_id: Date.now().toString(),
+              resource_type: "image",
+              format: path.extname(req.file.originalname).substring(1) || "jpg",
+            },
+            (error, result) => {
+              if (error) {
+                reject(error);
+              } else {
+                resolve(result.secure_url);
+              }
+            }
+          );
+          stream.end(req.file.buffer);
+        });
+
+      profilePicUrl = await uploadToCloudinary();
+    } catch (error) {
+      console.error("Error uploading image to Cloudinary:", error);
+      return res.status(500).json({ error: "Image upload failed" });
+    }
+  }
+
+  const updateQuery = `
+    UPDATE student
+    SET class_id = $1, address = $2, phone_number = $3, email = $4, roll_no = $5, name = $6, father_name = $7, profile_pic = COALESCE($8, profile_pic)
+    WHERE id = $9
+    RETURNING *;
+  `;
+
+  const values = [
+    class_id || null,
+    address,
+    phone_number,
+    email,
+    roll_no,
+    name,
+    father_name,
+    profilePicUrl,
+    id,
+  ];
+
+  try {
+    const result = await postgresPool.query(updateQuery, values);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Student not found" });
+    }
+    return res.status(200).json(result.rows[0]);
+  } catch (error) {
+    console.error("Error while updating the student:", error.message);
+    return res.status(500).json({
+      error: "An error occurred while updating the student.",
+    });
+  }
+});
+
+// Get student throgh id
+app.get("/api/student/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const result = await postgresPool.query("SELECT * FROM student WHERE id = $1", [id]);
+
+    if (result.rows.length > 0) {
+      res.status(200).json(result.rows[0]);
+    } else {
+      res.status(404).json({ error: "Student not found" });
+    }
+  } catch (error) {
+    console.error("Error fetching student data:", error.stack); // Log error stack for detailed error
+    res.status(500).json({ error: "An error occurred while fetching student data" });
+  }
+});
+
+
+
 // Post method for class
 app.post("/api/class", async (req, res) => {
   const { class_name, section } = req.body;
