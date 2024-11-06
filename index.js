@@ -5,6 +5,8 @@ import Pool from "pg-pool";
 import multer from "multer";
 import { v2 as cloudinary} from "cloudinary";
 import path from "path";
+import bodyParser from "body-parser";
+
 
 dotenv.config();
 
@@ -14,8 +16,18 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET
  });
 
-const storage = multer.memoryStorage();
-const upload = multer({storage});
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'profile_pic/')
+  },
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + '-' + file.originalname)
+  }
+});
+const upload = multer({
+  storage,
+  limits: {fileSize: 10 * 1024 *1024}
+});
 
 
 
@@ -23,9 +35,9 @@ const app = express();
 
 
 const port = 3000;
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(cors({origin: "http://localhost:5173"}));
+app.use(bodyParser.json({limit: '10mb'}));
+app.use(bodyParser.urlencoded({limit: '10mb', extended: true }));
+app.use(cors());
 
 const postgresPool = new Pool({
   user: process.env.DB_USER,
@@ -323,7 +335,7 @@ app.put("/api/student/:id", upload.single("profile_pic"), async (req, res) => {
       profilePicUrl = await uploadToCloudinary();
     } catch (error) {
       console.error("Error uploading image to Cloudinary:", error);
-      return res.status(500).json({ error: "Image upload failed" });
+      return res.status(500).json({ error: "Image size upload failed" });
     }
   }
 
