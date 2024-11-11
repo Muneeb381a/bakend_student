@@ -34,8 +34,7 @@ const postgresPool = new Pool({
   port: parseInt(process.env.DB_PORT, 10),
   max: parseInt(process.env.DB_MAX_CLIENTS, 10),
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
-  ssl: { rejectUnauthorized: false },
+  connectionTimeoutMillis: 5000
 });
 
 // Function to connect to the PostgreSQL database
@@ -56,43 +55,53 @@ app.listen(port, () => {
 });
 
 app.get("/api/students", async (req, res) => {
-  try {
-    const result = await postgresPool.query(`
-          SELECT 
-              s.id,
-              s.name,
-              s.father_name,
-              s.address,
-              s.phone_number,
-              s.email,
-              s.roll_no,
-              s.profile_pic,
-              c.class_name,
-              f.amount AS fee_amount,
-              f.due_date AS fee_due_date,
-              f.status AS fee_status
-          FROM 
-              student s
-          LEFT JOIN 
-              class c ON s.class_id = c.class_id
-          LEFT JOIN 
-              fee f ON s.fee_id = f.fee_id
-          ORDER BY
-              s.id ASC
-      `);
+  const query = `
+    SELECT 
+      s.id,
+      s.class_id,
+      s.fee_id,
+      s.address,
+      s.phone_number,
+      s.email,
+      s.roll_no,
+      s.name,
+      s.father_name,
+      s.profile_pic,
+      s.gender,
+      s.dob,
+      s.age,
+      s.previous_school,
+      s.previous_class,
+      s.mother_name,
+      s.father_occupation,
+      s.mother_occupation,
+      s.father_email,
+      s.mother_email,
+      s.father_cnic,
+      s.mother_cnic,
+      s.b_form_number,
+      s.whatsapp_number,
+      s.created_at,
+      s.updated_at,
+      c.class_name,   -- Class details
+      f.fee_type,     -- Fee details
+      f.amount,
+      f.description
+    FROM student s
+    LEFT JOIN class c ON s.class_id = c.id
+    LEFT JOIN fee f ON s.fee_id = f.id;
+  `;
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "No students found" });
-    }
+  try {
+    const result = await postgresPool.query(query);
 
     return res.status(200).json(result.rows);
   } catch (error) {
-    console.error("Error fetching students:", error.message);
-    res
-      .status(500)
-      .json({ error: "An error occurred while fetching students." });
+    console.error("Error while fetching students:", error.message);
+    return res.status(500).json({ error: "An error occurred while fetching the students." });
   }
 });
+
 
 app.get("/class", async (req, res) => {
   try {
