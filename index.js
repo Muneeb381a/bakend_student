@@ -3,7 +3,7 @@ import dotenv from "dotenv";
 import cors from "cors";
 import Pool from "pg-pool";
 import multer from "multer";
-import { v2 as cloudinary} from "cloudinary";
+import { v2 as cloudinary } from "cloudinary";
 import path from "path";
 
 dotenv.config();
@@ -12,10 +12,10 @@ cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET
- });
+});
 
 const storage = multer.memoryStorage();
-const upload = multer({storage});
+const upload = multer({ storage });
 
 
 
@@ -105,20 +105,31 @@ app.get("/api/students", async (req, res) => {
 
 app.get("/api/class", async (req, res) => {
   try {
-    const result = await postgresPool.query("SELECT * FROM class");
+    // Query to fetch classes and convert created_at and updated_at to Pakistan Standard Time (PST)
+    const query = `
+      SELECT 
+        id, 
+        class_name, 
+        section, 
+        created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Karachi' AS created_at,
+        updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Karachi' AS updated_at
+      FROM class
+    `;
+    const result = await postgresPool.query(query);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "No class found" });
     }
 
-    return res.status(200).json(result.rows);
+    return res.status(200).json(result.rows); // Returning time in Pakistan Standard Time
   } catch (error) {
     console.error("Error fetching class:", error.message);
-    res
-      .status(500)
-      .json({ error: "An error occurred while fetching classes." });
+    return res.status(500).json({ error: "An error occurred while fetching classes." });
   }
 });
+
+
+
 
 app.get("/api/students/:student_id/fees", async (req, res) => {
   const studentId = req.params.student_id;
@@ -464,7 +475,7 @@ app.post("/api/class", async (req, res) => {
 
 // POSt method for fee
 app.post("/api/fee", async (req, res) => {
-  const { student_id, amount, due_date, status } = req.body; 
+  const { student_id, amount, due_date, status } = req.body;
 
   const query = `
     INSERT INTO fee (student_id, amount, due_date, status) 
@@ -517,5 +528,21 @@ app.get("/api/students/:id", async (req, res) => {
     res
       .status(500)
       .json({ error: "An error occurred while fetching student details." });
+  }
+});
+
+
+// delete route for class
+app.delete("/api/class/:id", async (req, res) => {
+  const classId = req.params.id;
+  try {
+    const result = await postgresPool.query("DELETE FROM class WHERE id = $1 RETURNING *", [classId]);
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Class not found" });
+    }
+    return res.status(200).json({ message: "Class deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting class:", error);
+    res.status(500).json({ error: "An error occurred while deleting the class." });
   }
 });
