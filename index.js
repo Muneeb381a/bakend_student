@@ -103,7 +103,7 @@ app.get("/api/students", async (req, res) => {
 });
 
 
-app.get("/class", async (req, res) => {
+app.get("/api/class", async (req, res) => {
   try {
     const result = await postgresPool.query("SELECT * FROM class");
 
