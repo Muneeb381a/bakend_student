@@ -54,6 +54,8 @@ app.listen(port, () => {
   console.log(`Server is listening at port ${port}`);
 });
 
+// geeting students
+
 app.get("/api/students", async (req, res) => {
   const query = `
     SELECT 
@@ -86,9 +88,12 @@ app.get("/api/students", async (req, res) => {
       s.address_2,
       s.profile_pic,
       s.admission_date,
-      c.class_name -- Class details
+      c.class_name, 
+      f.amount, 
+      f.status 
     FROM student s
-    LEFT JOIN class c ON s.class_id = c.id;
+    LEFT JOIN class c ON s.class_id = c.id
+    LEFT JOIN fee f ON s.id = f.student_id; 
   `;
 
   try {
@@ -101,34 +106,45 @@ app.get("/api/students", async (req, res) => {
 });
 
 
-
-
-app.get("/api/class", async (req, res) => {
+// getting fee
+app.get("/api/fees", async (req, res) => {
   try {
-    // Query to fetch classes and convert created_at and updated_at to Pakistan Standard Time (PST)
+    // Base query to fetch fee data with joins
     const query = `
       SELECT 
-        id, 
-        class_name, 
-        section, 
-        created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Karachi' AS created_at,
-        updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Karachi' AS updated_at
-      FROM class
+        s.name AS student_name, 
+        s.roll_no,
+        c.class_name,
+        c.section,
+        f.fee_type,
+        f.amount AS fee_amount, 
+        f.due_date AS fee_due_date, 
+        f.status AS fee_status
+      FROM 
+        fee f
+      JOIN 
+        student s ON s.id = f.student_id
+      JOIN 
+        class c ON c.id = s.class_id;
     `;
+
+    // Execute the query
     const result = await postgresPool.query(query);
 
+    // Check if any records were returned
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: "No class found" });
+      return res.status(404).json({ error: "No fee records found." });
     }
 
-    return res.status(200).json(result.rows); // Returning time in Pakistan Standard Time
+    // Return the results
+    return res.status(200).json({
+      data: result.rows,
+    });
   } catch (error) {
-    console.error("Error fetching class:", error.message);
-    return res.status(500).json({ error: "An error occurred while fetching classes." });
+    console.error("Error fetching fees:", error.message);
+    res.status(500).json({ error: "An error occurred while fetching fees." });
   }
 });
-
-
 
 
 app.get("/api/students/:student_id/fees", async (req, res) => {
@@ -152,36 +168,6 @@ app.get("/api/students/:student_id/fees", async (req, res) => {
     return res
       .status(500)
       .json({ error: "An error occurred while fetching fees." });
-  }
-});
-
-app.get("/api/fees", async (req, res) => {
-  try {
-    const query = `
-      SELECT 
-        s.name AS student_name, 
-        s.roll_no,
-        c.class_name,
-        c.section,
-        f.amount AS fee_amount, 
-        f.due_date AS fee_due_date, 
-        f.status AS fee_status
-      FROM 
-        fee f
-      JOIN 
-        student s ON s.id = f.student_id
-      JOIN 
-        class c ON c.class_id = s.class_id;
-    `;
-    const result = await postgresPool.query(query);
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "No fee records found" });
-    }
-    return res.status(200).json(result.rows);
-  } catch (error) {
-    console.error("Error fetching fees:", error.message);
-    res.status(500).json({ error: "An error occurred while fetching fees." });
   }
 });
 
