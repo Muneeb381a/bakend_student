@@ -23,7 +23,7 @@ const app = express();
 
 app.use(cors());
 const port = 3000;
-app.use(express.json({ limit: "10mb" })); 
+app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 const postgresPool = new Pool({
@@ -253,10 +253,10 @@ app.post("/api/student", upload.fields([{ name: "profile_pic" }, { name: "certif
   const uploadToCloudinary = async (file, folder) => {
     return new Promise((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream(
-        { 
-          folder, 
-          public_id: Date.now().toString(), 
-          resource_type: "image", 
+        {
+          folder,
+          public_id: Date.now().toString(),
+          resource_type: "image",
           timeout: 60000 // Increased timeout to 60 seconds
         },
         (error, result) => {
@@ -269,16 +269,16 @@ app.post("/api/student", upload.fields([{ name: "profile_pic" }, { name: "certif
           }
         }
       );
-  
+
       if (!file || !file.buffer) {
         reject(new Error("Invalid file or file buffer"));
         return;
       }
-  
+
       stream.end(file.buffer); // Pass the file buffer to the stream
     });
   };
-  
+
 
   let profilePicUrl = null;
   let certificatesUrl = null;
@@ -514,11 +514,11 @@ app.post("/api/class", async (req, res) => {
 
 // POSt method for fee
 app.post("/api/fee", async (req, res) => {
-  const { student_id, amount, due_date, status } = req.body;
+  const { student_id, amount, due_date, status, type_id } = req.body; // Include type_id for fee type
 
   const query = `
-    INSERT INTO fee (student_id, amount, due_date, status) 
-    VALUES ($1, $2, $3, $4)
+    INSERT INTO fee (student_id, amount, due_date, status, type_id) 
+    VALUES ($1, $2, $3, $4, $5) 
     RETURNING fee_id; 
   `;
 
@@ -528,47 +528,103 @@ app.post("/api/fee", async (req, res) => {
       amount,
       due_date,
       status,
+      type_id, 
     ]);
-    res
-      .status(201)
-      .json({
-        fee_id: result.rows[0].fee_id,
-        message: "Fee submitted successfully!",
-      });
+    res.status(201).json({
+      fee_id: result.rows[0].fee_id,
+      message: "Fee submitted successfully!",
+    });
   } catch (error) {
     console.error("Error submitting fee:", error);
-    res
-      .status(500)
-      .json({ error: "An error occurred while submitting the fee." });
+    res.status(500).json({ error: "An error occurred while submitting the fee." });
   }
 });
 
+// getting fee type
+app.get("/api/fee-types", async (req, res) => {
+  const query = "SELECT type_id, type_name FROM fee_types"; // Correct column names and table name
+
+  try {
+    const result = await postgresPool.query(query);
+    res.status(200).json(result.rows); // Respond with the list of fee types
+  } catch (error) {
+    console.error("Error fetching fee types:", error);
+    res.status(500).json({ error: "An error occurred while fetching fee types." });
+  }
+});
+
+
+
 // Get student by id
 
-app.get("/api/students/:id", async (req, res) => {
-  const studentId = req.params.id;
+app.get("/api/students/:studentId", async (req, res) => {
+  const { studentId } = req.params;
 
+  // SQL query to get student details with class and fee information
   const query = `
-      SELECT s.id, s.name, s.father_name, s.roll_no, s.email, c.class_name, c.section
-      FROM student s
-      LEFT JOIN class c ON s.class_id = c.class_id 
-      WHERE s.id = $1
+    SELECT
+    s.id AS student_id,
+    s.class_id,
+    s.name,
+    s.roll_no,
+    c.class_name AS class_name,  
+    f.amount AS fee_amount,
+    f.status AS fee_status
+  FROM student s
+  LEFT JOIN class c ON s.class_id = c.id
+  LEFT JOIN fee f ON s.id = f.student_id
+  WHERE s.id = $1;
   `;
 
   try {
     const result = await postgresPool.query(query, [studentId]);
-    if (result.rows.length > 0) {
-      res.json(result.rows[0]);
-    } else {
-      res.status(404).json({ error: "Student not found" });
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Student not found" });
     }
+
+    const student = result.rows[0];
+    res.status(200).json({
+      student_id: student.student_id,
+      class_id: student.class_id,
+      name: student.name,
+      father_name: student.father_name,
+      mother_name: student.mother_name,
+      father_cnic: student.father_cnic,
+      mother_cnic: student.mother_cnic,
+      phone_number_with_code: student.phone_number_with_code,
+      whatsapp_number: student.whatsapp_number,
+      email: student.email,
+      roll_no: student.roll_no,
+      dob: student.dob,
+      age: student.age,
+      gender: student.gender,
+      blood_group: student.blood_group,
+      religion: student.religion,
+      nationality: student.nationality,
+      previous_class: student.previous_class,
+      previous_school: student.previous_school,
+      certificates: student.certificates,
+      disability: student.disability,
+      hobbies: student.hobbies,
+      emergency_contact_name: student.emergency_contact_name,
+      emergency_contact_relationship: student.emergency_contact_relationship,
+      emergency_contact_number: student.emergency_contact_number,
+      address_1: student.address_1,
+      address_2: student.address_2,
+      profile_pic: student.profile_pic,
+      admission_date: student.admission_date,
+      class_name: student.class_name || 'N/A',
+      fee_amount: student.fee_amount || null,
+      fee_status: student.fee_status || 'N/A'
+    });
   } catch (error) {
-    console.error("Error fetching student details:", error);
-    res
-      .status(500)
-      .json({ error: "An error occurred while fetching student details." });
+    console.error("Error fetching student:", error);
+    res.status(500).json({ error: "An error occurred while fetching the student." });
   }
 });
+
+
 
 
 // delete route for class
@@ -636,7 +692,7 @@ app.post("/api/student/picture", upload.single("profile_pic"), async (req, res) 
     VALUES ($1, $2)
     RETURNING *;
   `;
-  
+
   const values = [student_id, profilePicUrl];
 
   try {
