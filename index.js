@@ -512,6 +512,22 @@ app.post("/api/class", async (req, res) => {
   }
 });
 
+// get classes
+app.get("/api/class", async (req, res) => {
+  const query = `SELECT * FROM class`;
+
+  try {
+    const result = await postgresPool.query(query);
+    return res.status(200).json(result.rows); 
+  } catch (error) {
+    console.error("Error while fetching classes:", error.message);
+    return res.status(500).json({
+      error: "An error occurred while fetching classes.",
+    });
+  }
+});
+
+
 // POSt method for fee
 app.post("/api/fee", async (req, res) => {
   const { student_id, amount, due_date, status, type_id } = req.body; // Include type_id for fee type
@@ -817,3 +833,4 @@ app.delete('/attendance/:id', async (req, res) => {
       res.status(500).json({ error: 'Failed to delete attendance record' });
   }
 });
+
