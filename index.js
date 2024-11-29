@@ -705,3 +705,115 @@ app.post("/api/student/picture", upload.single("profile_pic"), async (req, res) 
     });  // Send error response
   }
 });
+
+
+
+// attendance
+
+app.post('/attendance', async (req, res) => {
+  const { attendanceRecords } = req.body; // Array of { student_id, class_id, date, status, remarks }
+  try {
+      const query = `
+          INSERT INTO attendance (student_id, class_id, date, status, remarks)
+          VALUES ($1, $2, $3, $4, $5)
+      `;
+      const promises = attendanceRecords.map(record =>
+          postgresPool.query(query, [
+              record.student_id,
+              record.class_id,
+              record.date,
+              record.status,
+              record.remarks || null
+          ])
+      );
+      await Promise.all(promises);
+      res.status(201).json({ message: 'Attendance recorded successfully' });
+  } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Failed to record attendance' });
+  }
+});
+
+// getting attendance detail
+app.get('/attendance/class/:classId/date/:date', async (req, res) => {
+  const { classId, date } = req.params;
+  try {
+      const result = await postgresPool.query(
+          `
+          SELECT a.id, s.name AS student_name, a.status, a.remarks
+          FROM attendance a
+          JOIN students s ON a.student_id = s.id
+          WHERE a.class_id = $1 AND a.date = $2
+          `,
+          [classId, date]
+      );
+      res.json(result.rows);
+  } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Failed to fetch attendance records' });
+  }
+});
+
+
+// atendance record for specific student
+app.get('/attendance/student/:studentId', async (req, res) => {
+  const { studentId } = req.params;
+  try {
+      const result = await postgresPool.query(
+          `
+          SELECT date, status, remarks
+          FROM attendance
+          WHERE student_id = $1
+          ORDER BY date DESC
+          `,
+          [studentId]
+      );
+      res.json(result.rows);
+  } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Failed to fetch attendance summary' });
+  }
+});
+
+
+// update attendance for student
+app.put('/attendance/:id', async (req, res) => {
+  const { id } = req.params; // Attendance record ID
+  const { status, remarks } = req.body;
+  try {
+      const result = await postgresPool.query(
+          `
+          UPDATE attendance
+          SET status = $1, remarks = $2
+          WHERE id = $3
+          RETURNING *
+          `,
+          [status, remarks || null, id]
+      );
+      if (result.rowCount === 0) {
+          return res.status(404).json({ error: 'Attendance record not found' });
+      }
+      res.json(result.rows[0]);
+  } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Failed to update attendance' });
+  }
+});
+
+// delete end point for attendace
+app.delete('/attendance/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+      const result = await postgresPool.query(
+          `DELETE FROM attendance WHERE id = $1 RETURNING *`,
+          [id]
+      );
+      if (result.rowCount === 0) {
+          return res.status(404).json({ error: 'Attendance record not found' });
+      }
+      res.json({ message: 'Attendance record deleted successfully' });
+  } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Failed to delete attendance record' });
+  }
+});
