@@ -809,3 +809,67 @@ app.delete('/attendance/:id', async (req, res) => {
   }
 });
 
+// getting timetable endpoint
+app.get("/timetable/:classId", async (req, res) => {
+  try {
+      const { classId } = req.params;
+      const result = await postgresPool.query(
+          `SELECT t.id, t.day, t.start_time, t.end_time, 
+                  s.name AS subject, 
+                  te.name AS teacher 
+           FROM timetable t
+           JOIN subjects s ON t.subject_id = s.id
+           JOIN teachers te ON t.teacher_id = te.id
+           WHERE t.class_id = $1
+           ORDER BY t.day, t.start_time`,
+          [classId]
+      );
+      res.json(result.rows);
+  } catch (error) {
+      res.status(500).json({ error: error.message });
+  }
+});
+
+// creating endpoints for adding new time table
+app.post("/timetable", async (req, res) => {
+  try {
+      const { class_id, day, subject_id, teacher_id, start_time, end_time } = req.body;
+      const result = await postgresPool.query(
+          `INSERT INTO timetable (class_id, day, subject_id, teacher_id, start_time, end_time)
+           VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+          [class_id, day, subject_id, teacher_id, start_time, end_time]
+      );
+      res.status(201).json(result.rows[0]);
+  } catch (error) {
+      res.status(500).json({ error: error.message });
+  }
+});
+
+// updating the existing time table
+app.put("/timetable/:id", async (req, res) => {
+  try {
+      const { id } = req.params;
+      const { day, subject_id, teacher_id, start_time, end_time } = req.body;
+      const result = await pool.query(
+          `UPDATE timetable
+           SET day = $1, subject_id = $2, teacher_id = $3, start_time = $4, end_time = $5
+           WHERE id = $6 RETURNING *`,
+          [day, subject_id, teacher_id, start_time, end_time, id]
+      );
+      res.json(result.rows[0]);
+  } catch (error) {
+      res.status(500).json({ error: error.message });
+  }
+});
+
+// creating delete endpoint for timetable
+app.delete("/timetable/:id", async (req, res) => {
+  try {
+      const { id } = req.params;
+      await postgresPool.query(`DELETE FROM timetable WHERE id = $1`, [id]);
+      res.status(204).send();
+  } catch (error) {
+      res.status(500).json({ error: error.message });
+  }
+});
+
